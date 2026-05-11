@@ -4,6 +4,8 @@ from scipy.integrate import solve_ivp
 from scipy.signal import find_peaks
 import matplotlib.pyplot as plt
 
+plt.close('all')
+
 # -----------------------
 # --- Hilfsfunktionen ---
 # -----------------------
@@ -58,15 +60,18 @@ def hpo_ode(t, x, p):
 
     return np.array([g1, g2, g3, g4, g5, g6, g7, g8, g9, g10])
 
+# -----------------------
+# --- Parameter ---
+# -----------------------
+
 x0 = np.ones(10)
 x0[0] = 3
 x0[1] = 3
 x0[5] = 10
 x0[8] = 0.01
 
-# -----------------------
-# --- Parameter ---
-# -----------------------
+t_end = 150; 
+
 params = {"a": 1, "b": 1, "c": 1, "d": 1, "e": 1, "f": 1, "g": 1, "h": 1, "i": 1, "j": 1,
           "V": 2.5, "delta_F": 8.21, "delta_L": 14, "delta_E": 1.1, "delta_P": 0.5,
           "v_F": 3219.9, "v_0L": 308.35, "v_1L": 44700,
@@ -88,11 +93,11 @@ def f(t, x):
 tol = dict(rtol=1e-6, atol=1e-8)
 
 t0 = time.perf_counter()
-sol_rk = solve_ivp(f, [0, 90], x0, method="RK45", **tol)
+sol_rk = solve_ivp(f, [0, t_end], x0, method="RK45", **tol)
 dt_rk = time.perf_counter() - t0
 
 t0 = time.perf_counter()
-sol_rad = solve_ivp(f, [0, 90], x0, method="Radau", **tol)
+sol_rad = solve_ivp(f, [0, t_end], x0, method="Radau", **tol)
 dt_rad = time.perf_counter() - t0
 
 print(f"RK45  : {len(sol_rk.t):>6} steps,  {dt_rk:.3f} s")
@@ -143,6 +148,12 @@ for i, name in enumerate(state_names):
     else:
         print(f"{name:<12} {len(pt):>8} {'—':>15} {'—':>14}")
 
+
+# -----------------------
+# --- Plots ---
+# -----------------------
+
+
 # --- Plot: Alle 10 Zustände mit markierten Peaks ---
 fig, axes = plt.subplots(5, 2, sharex=True, figsize=(12, 10))
 axes = axes.ravel()
@@ -157,5 +168,54 @@ for i in range(10):
 axes[-2].set_xlabel("t")
 axes[-1].set_xlabel("t")
 fig.tight_layout()
-plt.show()
+
+# --- 2D orbit plots ---
+# Each entry: (index_x, index_y)  — edit to explore other pairs
+phase_pairs = [
+    (0, 1),   # FSH_ρ  vs FSH
+    (2, 3),   # LH_ρ   vs LH
+    (8, 9),   # E₂     vs P₄
+    (1, 3),   # FSH    vs LH
+    (4, 5),   # Φ      vs Ω
+    (8, 3),   # E₂     vs LH
+]
+
+fig2, axes2 = plt.subplots(2, 3, figsize=(14, 8))
+axes2 = axes2.ravel()
+
+for ax, (xi, yi) in zip(axes2, phase_pairs):
+    sc = ax.scatter(x[:, xi], x[:, yi], c=t, cmap="viridis", s=2, linewidths=0)
+    ax.set_xlabel(state_names[xi])
+    ax.set_ylabel(state_names[yi])
+    ax.grid(True, alpha=0.3)
+    fig2.colorbar(sc, ax=ax, label="t")
+
+fig2.tight_layout()
+
+# --- 3D orbit plots ---
+# Each entry: (index_x, index_y, index_z)  — edit to explore other triplets
+phase_triplets = [
+    (1, 3, 8),   # FSH   vs LH  vs E₂
+    (1, 3, 9),   # FSH   vs LH  vs P₄
+    (8, 9, 3),   # E₂    vs P₄  vs LH
+    (4, 5, 6),   # Φ     vs Ω   vs Λ
+    (0, 2, 8),   # FSH_ρ vs LH_ρ vs E₂
+    (1, 8, 9),   # FSH   vs E₂  vs P₄
+]
+
+fig3 = plt.figure(figsize=(15, 9))
+for k, (xi, yi, zi) in enumerate(phase_triplets):
+    ax = fig3.add_subplot(2, 3, k + 1, projection="3d")
+    sc = ax.scatter(x[:, xi], x[:, yi], x[:, zi], c=t, cmap="plasma", s=1)
+    ax.set_xlabel(state_names[xi], fontsize=8)
+    ax.set_ylabel(state_names[yi], fontsize=8)
+    ax.set_zlabel(state_names[zi], fontsize=8)
+    fig3.colorbar(sc, ax=ax, shrink=0.5, label="t")
+
+fig3.tight_layout()
+plt.show(block=False)
+plt.pause(0.001)
+input("\nPress Enter to close all figures and exit. ")
+plt.close("all")
+
 
